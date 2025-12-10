@@ -1,25 +1,42 @@
 const jwt = require('jsonwebtoken');
 
-// Use environment variable for JWT secret
-const SECRET_KEY = process.env.JWT_SECRET;
+const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
-if (!SECRET_KEY) {
-  console.error('JWT_SECRET environment variable is not set!');
+if (!ACCESS_SECRET || !REFRESH_SECRET) {
+  console.error('JWT access/refresh secrets are not configured!');
   process.exit(1);
 }
 
-const generateToken = (userId) => {
-  const token = jwt.sign({userId}, SECRET_KEY, { expiresIn: '48h' });
-  return token;
+const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+
+const buildPayload = (user) => ({
+  userId: user._id || user.userId,
+  role: user.role,
+  email: user.email
+});
+
+const generateAccessToken = (user) => {
+  return jwt.sign(buildPayload(user), ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
 };
 
-const getUserIdFromToken = (token) => {
- const decodedToken = jwt.verify(token, SECRET_KEY);
-
- return decodedToken.userId;
+const generateRefreshToken = (user, tokenId = undefined) => {
+  const payload = { ...buildPayload(user) };
+  if (tokenId) {
+    payload.tokenId = tokenId;
+  }
+  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
 };
+
+const verifyAccessToken = (token) => jwt.verify(token, ACCESS_SECRET);
+const verifyRefreshToken = (token) => jwt.verify(token, REFRESH_SECRET);
+const decodeToken = (token) => jwt.decode(token);
 
 module.exports = {
-  generateToken,
-  getUserIdFromToken
+  generateAccessToken,
+  generateRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
+  decodeToken
 };

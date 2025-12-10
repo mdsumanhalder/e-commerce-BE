@@ -13,10 +13,18 @@ const findUserCart = async (req, res) => {
 
   const addItemToCart = async (req, res) => {
     const user = req.user;
-    console.log(user);
    try {
-      const cartItem = await cartService.addCartItem(user._id, req.body);
-      return res.status(200).send(cartItem);
+      const cart = await cartService.addCartItem(user._id, req.body);
+      return res.status(200).send(cart);
+    } catch (error) {
+      res.status(500).send({ error: error.message });
+    }
+  };
+
+  const clearCart = async (req, res) => {
+    try {
+      const cart = await cartService.clearCart(req.user._id);
+      return res.status(200).send(cart);
     } catch (error) {
       res.status(500).send({ error: error.message });
     }
@@ -24,5 +32,6 @@ const findUserCart = async (req, res) => {
 
   module.exports = {
     findUserCart,
-    addItemToCart
+    addItemToCart,
+    clearCart
   };

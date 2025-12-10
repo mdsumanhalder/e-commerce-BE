@@ -7,6 +7,11 @@ const orderItemSchema = new Schema({
         ref: 'products',
         required: true,
     },
+    seller: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'users',
+        required: true,
+    },
     size: {
         type: String,
     },
@@ -21,6 +26,12 @@ const orderItemSchema = new Schema({
     discountedPrice: {
         type: Number,
         required: true,
+    },
+    productSnapshot: {
+        title: String,
+        imageUrl: String,
+        brand: String,
+        color: String
     },
     userId:{
         type: mongoose.Schema.Types.ObjectId,

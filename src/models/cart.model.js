@@ -9,28 +9,31 @@ const cartSchema = new mongoose.Schema({
   cartItems: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'cartItems',
-    required: true,
+    default: [],
   }],
   totalPrice: {
     type: Number,
-    required: true,
     default: 0,
   },
   totalItem:{
     type: Number,
-    required: true,
     default: 0,
   },
   totalDiscountedPrice: {
     type: Number,
-    required: true,
     default: 0,
   },
   discounte:{
     type: Number,
-    required: true,
     default: 0,
+    default: 0,
+  },
+  currency: {
+    type: String,
+    default: 'USD'
   }
+}, {
+  timestamps: true
 });
 
 const Cart = mongoose.model('cart', cartSchema);

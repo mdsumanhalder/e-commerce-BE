@@ -4,31 +4,56 @@ const Address = require('../models/address.model');
 const Order = require('../models/order.model');
 const OrderItem = require('../models/orderItems.model');
 
-async function createOrder(user, shipAddress){
-   let address;
+const buildStatusHistoryEntry = (status, userId, note) => ({
+  status,
+  changedBy: userId,
+  note
+});
 
-   if (shipAddress._id) {
-      let existAddress = await Address.findById(shipAddress._id)
-      address = existAddress
-   } else {
-      address = new Address(shipAddress)
-      address.user = user;
-      await address.save()
-      user.address.push(address);
-      await user.save();
+async function resolveShippingAddress(user, shipAddress) {
+  if (!shipAddress) {
+    throw new Error('Shipping address is required');
+  }
+
+  if (shipAddress._id) {
+    const existAddress = await Address.findById(shipAddress._id);
+    if (!existAddress) throw new Error('Shipping address not found');
+    return existAddress;
+  }
+
+  const address = new Address(shipAddress);
+  address.user = user._id;
+  await address.save();
+  user.address.push(address);
+  await user.save();
+  return address;
+}
+
+async function createOrder(user, shipAddress){
+   const address = await resolveShippingAddress(user, shipAddress);
+   const cart = await cartService.findUserCart(user._id);
+   if (!cart || cart.cartItems.length === 0) {
+    throw new Error('Cart is empty');
    }
-    const cart = await cartService.findUserCart(user._id);
+
     const orderItems=[];
 
     for (let item of cart.cartItems) {
         const orderItem = new OrderItem({
-            price: item.price,
-            product: item.product,
+            price: item.product.price,
+            product: item.product._id,
             quantity: item.quantity,
             size: item.size,
             userId: item.userId,
-            discountedPrice: item.discountedPrice,
-        })
+            discountedPrice: item.product.discountedPrice,
+            seller: item.product.seller,
+            productSnapshot: {
+              title: item.product.title,
+              imageUrl: item.product.imageUrl,
+              brand: item.product.brand,
+              color: item.product.color
+            }
+        });
         const createdOrderItem = await orderItem.save();
         orderItems.push(createdOrderItem);
     }
@@ -40,18 +65,18 @@ async function createOrder(user, shipAddress){
         totalDiscountedPrice: cart.totalDiscountedPrice,
         discounte: cart.discounte,
         totalItem: cart.totalItem,
-        shippAddress: address,
+        shippingAddress: address,
+        statusHistory: [buildStatusHistoryEntry('PENDING', user._id, 'Order created')]
     });
 
     const savedOrder = await createdOrder.save();
+    await cartService.clearCart(user._id);
     return savedOrder;
 }
 
 async function createOrderWithPayment(user, shipAddress, currency = 'usd'){
-    // Create the order first
     const order = await createOrder(user, shipAddress);
     
-    // Create payment intent for the order
     try {
         const paymentIntent = await paymentService.createPaymentIntent(
             order.totalDiscountedPrice,
@@ -69,53 +94,36 @@ async function createOrderWithPayment(user, shipAddress, currency = 'usd'){
             }
         };
     } catch (error) {
-        // If payment intent creation fails, we might want to delete the order
-        // or mark it as payment-pending
         throw new Error(`Order created but payment setup failed: ${error.message}`);
     }
 }
 
-
-// For ADMIN this method
-async function placeOrder(orderId){
+async function updateOrderStatus(orderId, status, actorId, note){
     const order = await findOrderById(orderId);
-
-    order.orderStatus = "PLACED";
-    order.paymentDetails.status = "COMPLETED";
-
-    return await order.save();
+    order.orderStatus = status;
+    order.statusHistory.push(buildStatusHistoryEntry(status, actorId, note));
+    await order.save();
+    return order;
 }
 
-async function  confirmOrder(orderId){
-    const order = await findOrderById(orderId);
-
-    order.orderStatus = "CONFIRMED";
-    
-    return await order.save();
+async function placeOrder(orderId, actorId){
+    return updateOrderStatus(orderId, 'PLACED', actorId, 'Order placed by admin');
 }
 
-async function shipOrder(orderId){
-    const order = await findOrderById(orderId);
-
-    order.orderStatus = "SHIPPED";
-    
-    return await order.save();
+async function confirmOrder(orderId, actorId){
+    return updateOrderStatus(orderId, 'CONFIRMED', actorId, 'Order confirmed');
 }
 
-async function deliverOrder(orderId){
-    const order = await findOrderById(orderId);
-
-    order.orderStatus = "DELIVERED";
-    
-    return await order.save();
+async function shipOrder(orderId, actorId){
+    return updateOrderStatus(orderId, 'SHIPPED', actorId, 'Order shipped');
 }
 
-async function cancelledOrder(orderId){
-    const order = await findOrderById(orderId);
+async function deliverOrder(orderId, actorId){
+    return updateOrderStatus(orderId, 'DELIVERED', actorId, 'Order delivered');
+}
 
-    order.orderStatus = "CANCELLED";
-    
-    return await order.save();
+async function cancelledOrder(orderId, actorId){
+    return updateOrderStatus(orderId, 'CANCELLED', actorId, 'Order cancelled');
 }
 
 async function findOrderById(orderId){
@@ -129,7 +137,7 @@ async function findOrderById(orderId){
     
 async function usersOrderHistory(userId){
     try {
-        const orders = await Order.find({user: userId, orderStatus: "PLACED"})
+        const orders = await Order.find({user: userId})
         .populate({path: 'orderItems', populate: { path: 'product' }}).lean();
 
         return orders;
@@ -139,9 +147,25 @@ async function usersOrderHistory(userId){
     }
 }
 
-async function getAllOrders(){
-    return await Order.find({user: userId, orderStatus: "PLACED"})
-        .populate({path: 'orderItems', populate: { path: 'product' }}).lean();
+async function getAllOrders(filter = {}){
+    return await Order.find(filter)
+        .populate({path: 'orderItems', populate: { path: 'product' }})
+        .populate('user')
+        .populate('shippingAddress')
+        .lean();
+}
+
+async function findOrdersBySeller(sellerId) {
+  const sellerItems = await OrderItem.find({ seller: sellerId }).select('_id');
+  if (!sellerItems.length) {
+    return [];
+  }
+  const itemIds = sellerItems.map(item => item._id);
+  return await Order.find({ orderItems: { $in: itemIds } })
+    .populate({ path: 'orderItems', populate: { path: 'product' } })
+    .populate('user')
+    .populate('shippingAddress')
+    .lean();
 }
 
 async function deleteOrder(orderId){
@@ -160,5 +184,6 @@ module.exports = {
     deleteOrder,
     placeOrder,
     confirmOrder,
-    shipOrder
-}
+    shipOrder,
+    findOrdersBySeller
+};

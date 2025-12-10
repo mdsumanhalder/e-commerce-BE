@@ -1,4 +1,5 @@
 const CartItem = require('../models/cartItem.model');
+const Cart = require('../models/cart.model');
 const userService = require('../services/user.service');
 
 async function updateCartItem(userId, cartItemId, cartItemData){
@@ -31,7 +32,9 @@ async function removeCartItem(userId, cartItemId){
         const user = await userService.findUserById(userId);
           
         if(user._id.toString()=== cartItem.userId.toString()){
-          return  await CartItem.findByIdAndDelete(cartItemId);
+          await CartItem.findByIdAndDelete(cartItemId);
+          await Cart.updateOne({ user: userId }, { $pull: { cartItems: cartItemId } });
+          return true;
         }
         throw new Error("you can not remove another user's item");
 }

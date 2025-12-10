@@ -11,10 +11,10 @@ const createRating = async (req, res) => {
 }
 
 const getAllRatings = async (req, res) => {
-    const { id } = req.params;
+    const { productId } = req.params;
     try {
-        const ratings = await ratingService.getAllRatings(id);
-        return res.status(201).send(ratings);
+        const ratings = await ratingService.getAllRatings(productId);
+        return res.status(200).send(ratings);
     } catch (error) {
         res.status(500).send({ error: error.message });
     }

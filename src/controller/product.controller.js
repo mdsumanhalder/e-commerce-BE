@@ -1,35 +1,5 @@
 const productService = require('../services/product.service');
 
-
-const createProduct = async (req, res) => {
-    try {
-        const product = await productService.createProduct(req.body);
-        return res.status(201).send(product);
-    } catch (error) {
-        res.status(500).send({ error: error.message });
-    }
-}
-
-const deleteProduct = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const product = await productService.deleteProduct(id);
-        return res.status(201).send(product);
-    } catch (error) {
-        res.status(500).send({ error: error.message });
-    }
-}
-
-const updateProduct = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const product = await productService.updateProduct(id, req.body);
-        return res.status(201).send(product);
-    } catch (error) {
-        res.status(500).send({ error: error.message });
-    }
-};
-
 const findProductById = async (req, res) => {
     const { id } = req.params;
     try {
@@ -44,15 +14,6 @@ const getAllProducts = async (req, res) => {
     try {
         const products = await productService.getAllProducts(req.query);
         return res.status(201).send(products);
-    } catch (error) {
-        res.status(500).send({ error: error.message });
-    }
-}
-
-const createMultipleProduct = async (req, res) => {
-    try {
-        const products = await productService.createMultipleProduct(req.body);
-        return res.status(201).send({message: "Products created successfully"});
     } catch (error) {
         res.status(500).send({ error: error.message });
     }
@@ -170,7 +131,7 @@ const createSampleProducts = async (req, res) => {
         }
 
         const allProducts = [...sampleProducts, ...additionalProducts];
-        await productService.createMultipleProduct(allProducts);
+        await productService.createMultipleProduct(allProducts, req.user);
         
         return res.status(201).send({
             message: `${allProducts.length} sample products created successfully`,
@@ -182,11 +143,7 @@ const createSampleProducts = async (req, res) => {
 }
 
 module.exports = {
-    createProduct,
-    deleteProduct,
-    updateProduct,
     findProductById,
     getAllProducts,
-    createMultipleProduct,
     createSampleProducts
 };

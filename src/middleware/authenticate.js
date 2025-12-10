@@ -8,17 +8,28 @@ const authenticate = async (req, res, next) => {
       return res.status(401).send({ error: 'Token not found' });
     }
 
-    const userId = jwtProvider.getUserIdFromToken(token);
+    const payload = jwtProvider.verifyAccessToken(token);
+    const user = await userService.findUserById(payload.userId);
 
-    // Await the async call to find user
-    const user = await userService.findUserById(userId);
     if (!user) {
       return res.status(401).send({ error: 'User not found' });
     }
 
-    req.user = user; // ✅ set the real user object
+    if (!user.isActive) {
+      return res.status(403).send({ error: 'Account is inactive. Please contact support.' });
+    }
+
+    req.user = user;
+    req.auth = payload;
+    req.token = token;
     next();
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).send({ error: 'Access token expired' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).send({ error: 'Invalid access token' });
+    }
     res.status(500).send({ error: error.message });
   }
 };

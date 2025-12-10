@@ -15,10 +15,15 @@ async function  createRating(req, user){
 
 
 async function getProductRating(productId){
- return await Rating.find({product:productId});
+ return await Rating.find({product:productId}).populate('user');
+}
+
+async function getAllRatings(productId){
+    return getProductRating(productId);
 }
 
 module.exports = {
     createRating,
-    getProductRating
+    getProductRating,
+    getAllRatings
 };

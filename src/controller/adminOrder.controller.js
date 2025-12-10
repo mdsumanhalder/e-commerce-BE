@@ -1,4 +1,5 @@
 const orderService = require('../services/orderService');
+const auditLogService = require('../services/auditLog.service');
 
 
 const getAllOrders = async (req, res) => {
@@ -10,51 +11,91 @@ const getAllOrders = async (req, res) => {
     }
 };
 
-const confirmedOrders = async (req, res) => {
-    const { id } = req.params;
+const confirmOrder = async (req, res) => {
+    const { orderId } = req.params;
     try {
-        const orders = await orderService.confirmOrder(id);
-        return res.status(200).send(orders);
+        const order = await orderService.confirmOrder(orderId, req.user._id);
+        await auditLogService.recordLog({
+            actor: req.user._id,
+            action: 'ORDER_CONFIRMED',
+            targetType: 'ORDER',
+            targetId: orderId,
+            metadata: {},
+            request: req
+        });
+        return res.status(200).send(order);
     } catch (error) {
         res.status(500).send({ error: error.message });
     }
 }
 
-const shippOrders = async (req, res) => {
-    const { id } = req.params;
+const shipOrder = async (req, res) => {
+    const { orderId } = req.params;
     try {
-        const orders = await orderService.shipOrder(id);
-        return res.status(200).send(orders);
+        const order = await orderService.shipOrder(orderId, req.user._id);
+        await auditLogService.recordLog({
+            actor: req.user._id,
+            action: 'ORDER_SHIPPED',
+            targetType: 'ORDER',
+            targetId: orderId,
+            metadata: {},
+            request: req
+        });
+        return res.status(200).send(order);
     } catch (error) {
         res.status(500).send({ error: error.message });
     }
 }
 
-const deliverOrders = async (req, res) => {
-    const { id } = req.params;
+const deliverOrder = async (req, res) => {
+    const { orderId } = req.params;
     try {
-        const orders = await orderService.deliverOrder(id);
-        return res.status(200).send(orders);
+        const order = await orderService.deliverOrder(orderId, req.user._id);
+        await auditLogService.recordLog({
+            actor: req.user._id,
+            action: 'ORDER_DELIVERED',
+            targetType: 'ORDER',
+            targetId: orderId,
+            metadata: {},
+            request: req
+        });
+        return res.status(200).send(order);
     } catch (error) {
         res.status(500).send({ error: error.message });
     }
 }
 
-const cancelledOrders = async (req, res) => {
-    const { id } = req.params;
+const cancelOrder = async (req, res) => {
+    const { orderId } = req.params;
     try {
-        const orders = await orderService.cancelledOrder(id);
-        return res.status(200).send(orders);
+        const order = await orderService.cancelledOrder(orderId, req.user._id);
+        await auditLogService.recordLog({
+            actor: req.user._id,
+            action: 'ORDER_CANCELLED_ADMIN',
+            targetType: 'ORDER',
+            targetId: orderId,
+            metadata: {},
+            request: req
+        });
+        return res.status(200).send(order);
     } catch (error) {
         res.status(500).send({ error: error.message });
     }
 }
 
-const deleteOrders = async (req, res) => {
-    const { id } = req.params;
+const deleteOrder = async (req, res) => {
+    const { orderId } = req.params;
     try {
-        const orders = await orderService.deleteOrder(id);
-        return res.status(200).send(orders);
+        await orderService.deleteOrder(orderId);
+        await auditLogService.recordLog({
+            actor: req.user._id,
+            action: 'ORDER_DELETED',
+            targetType: 'ORDER',
+            targetId: orderId,
+            metadata: {},
+            request: req
+        });
+        return res.status(204).send();
     } catch (error) {
         res.status(500).send({ error: error.message });
     }
@@ -62,9 +103,9 @@ const deleteOrders = async (req, res) => {
 
 module.exports = {
     getAllOrders,
-    confirmedOrders,
-    shippOrders,
-    deliverOrders,
-    cancelledOrders,
-    deleteOrders
+    confirmOrder,
+    shipOrder,
+    deliverOrder,
+    cancelOrder,
+    deleteOrder
 };
